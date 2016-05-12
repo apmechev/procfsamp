@@ -29,8 +29,8 @@
 #include <iostream>
 #include <iomanip>
 
-#include "LOFARTimer.h"
-#include "PrettyUnits.h"
+#include "../include/LOFARTimer.h"
+#include "../include/PrettyUnits.h"
 
 
 using namespace std;

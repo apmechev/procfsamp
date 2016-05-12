@@ -1,4 +1,4 @@
-#include "GUTimer.h"
+#include "../include/GUTimer.h"
 
 GUTimer::GUTimer(GUTimer::Type type)
 {

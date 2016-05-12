@@ -1,4 +1,4 @@
-#include "customtimer.h"
+#include "../include/customtimer.h"
 
 customtimer::customtimer(std::string type)
 {
