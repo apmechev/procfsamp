@@ -4,7 +4,7 @@
 //Timer includes
 //#include <boost/timer.hpp>
 
-#include "GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
+#include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
 
 //typedef long  DWORD; //4bytes
