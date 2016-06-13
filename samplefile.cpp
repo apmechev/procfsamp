@@ -7,61 +7,6 @@
 #include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
 
-//typedef long  DWORD; //4bytes
-//template <typename Word>
-//std::ifstream& read_word( std::ifstream& ins, Word& value );
-
-//
-//std::string
-//getFileContent(const std::string& path)
-//{
-//    GUTimer t(GUTimer::chrono_hr);// GUTimer t(GUTimer::time_h)
-//    GUTimer t1(GUTimer::chrono_hr);// GUTimer t(GUTimer::time_h)
-//    t.start();
-//    std::ifstream file(path,std::ifstream::binary);
-//    t.stop();
-////   DWORD word1;
-////   DWORD word2;
-//
-//  t1.start();
-//
-////  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-//  file.seekg(7);                          //rchar
-//  char *  result= new char [70];
-//  file.read(result,70);
-//  //
-//// file.seekg(238);                          //VMpeak
-//// file.read((char*)&word1,sizeof(long)-1);  //VMpeak (+-1 byte)//
-//// file.seekg(258);                          //VMsize
-//// file.read((char*)&word1,sizeof(long)-1);  //VMsize (+-1 byte)
-////
-////
-////  file.close();
-//  t1.stop();
-////  std::stringstream stream; stream << std::hex << word1;
-////  std::string result( stream.str() );
-//  std::cout<<t.getElapsed()<<" "<<t1.getElapsed()<<"\n";
-//  std::cout<<"$samp "<<result<<'\n';
-////   delete[] result;
-//
-//  return "";
-//}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //=============
 //=============
 
@@ -183,6 +128,7 @@ int main(int argc, char *argv[]) {
  time_t t = time(0);
  struct tm * now = localtime( & t );
  std::cout <<"$Start time "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
+
 
  while(exists("/proc/"+pid_s+"/exe"))
  {
