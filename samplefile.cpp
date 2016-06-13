@@ -1,12 +1,10 @@
 #include <fstream>         /* std::ifstream */
 #include <iostream>         /* std::cout */
 
-//Timer includes
-//#include <boost/timer.hpp>
-
 #include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
-
+#include <sys/stat.h>
+#include<csignal>       /*kill()*/
 //=============
 //=============
 
@@ -15,7 +13,6 @@ getio(const std::string& path)
 {
 
   std::ifstream file(path);
-
 
   std::string readchars,dummy,wrchars,syscw,syscr,read_bytes,write_bytes;
   file>>dummy>> readchars>>dummy>>wrchars>>dummy>>syscr>>dummy>>syscw>>dummy>>read_bytes>>dummy>>write_bytes;
@@ -49,22 +46,36 @@ getstat(const std::string& pid)//Get memory information (in one block right now)
 }
 
 
-//template <typename Word>
-//std::ifstream& read_word( std::ifstream& ins, Word& value )
-//  {
-//  for (unsigned size = 0, value = 0; size < sizeof( Word ); ++size)
-//    value |= ins.get() << (8 * size);
-//  return ins;
-//  }
-#include <sys/stat.h>
-
-inline bool exists (const std::string& name) {
+inline bool
+exists (const std::string& name) {
   struct stat buffer;
   return (stat (name.c_str(), &buffer) == 0);
 }
 
-int main(int argc, char *argv[]) {
- std::string pid_s,configfile="",pnames="",delays;
+void
+getPiD(std::string& str_pid, std::string& str_pname)
+{
+
+ if(str_pid=="")
+  {
+    while(str_pid=="")
+    {
+      FILE* fpidof = popen(("pidof "+str_pname).c_str(),"r");
+      if (fpidof)
+      {
+        int p=0;
+        if (fscanf(fpidof, "%d", &p)>0 && p>0)
+        str_pid = std::to_string(p);
+        pclose(fpidof);
+      }
+    }
+  }
+return;
+}
+
+int
+main(int argc, char *argv[]) {
+ std::string str_pid,configfile="",str_pname="",delays,str_command;
  int delay=1000000;
  if ( argc < 2 ){
     std::cout<<"usage: "<< argv[0] <<" PID configfile \n";
@@ -73,17 +84,18 @@ int main(int argc, char *argv[]) {
  else
   { if(isdigit(argv[1][0])) //Process ID number
     {
-      pid_s= argv[1];
+      str_pid= argv[1];
     }
     else                    //Either *.cfg file or process launch (NOT implemented)
     {
      configfile=argv[1];
-     if (configfile!="" and configfile.find(".cfg"))
+
+     if (configfile.find(".cfg")!=std::string::npos) //if a configure file is specified
       {
        std::ifstream infile(configfile);
        if (infile.good())
         {
-         getline(infile,pnames);
+         getline(infile,str_pname);
          getline(infile,delays);
         }
         if (delays=="")
@@ -95,31 +107,43 @@ int main(int argc, char *argv[]) {
          delay=1000*std::stoi(delays);
         }
        infile.close();
+       // Check if process name exists and get PID
+       getPiD(str_pid,str_pname);
       }
-      else
+
+      else if(argv[1]!=""){  //launch process from here
+      std::cout<<"Launching process "<<configfile<<std::endl;
+      std::flush(std::cout);
+
+      int pid = fork();
+      if(pid==0)
+        {
+        int rc = execl(argv[1], "&");
+
+        if (rc==-1) std::cout<<"Couldn't launch process "<<configfile<<" Did you have the path right?"<<std::endl;
+        }
+      else  //parent process
+        {
+           std::cout<<"Parent Process";
+           std::string str_name="firefox";//extract name from path
+           // Check if process name exists and get PID
+           getPiD(str_pid,str_name);
+        }
+      }
+      else //otherwise the process name to track
       {
-        pnames=argv[1];
+        str_pname=argv[1];
+        std::cout<<str_pname;
+        std::flush(std::cout);
       }
     }
   }
 
+  std::cout<<"$proc "<<str_pid<<" "<<str_pname<< " from "<<configfile<<" with delay (ms) "<<delay/1000<<std::endl;
 
-
- if(pid_s=="")
-  {
-    while(pid_s=="")
-    {
-      FILE* fpidof = popen(("pidof "+pnames).c_str(),"r");
-      if (fpidof)
-      {
-        int p=0;
-        if (fscanf(fpidof, "%d", &p)>0 && p>0)
-        pid_s = std::to_string(p);
-        pclose(fpidof);
-      }
-    }
-  }
-  std::cout<<pid_s<<" "<<pnames<< " from "<<configfile<<" with delay (ms) "<<delay/1000<<std::endl;
+  std::ifstream filec("/proc/"+str_pid+"/cmdline");
+  filec>>str_command;
+  std::cout<<"$proc cmd: "<<str_command<<std::endl;
 
   std::cout<<"$proc-m VmSize(pg), VMRSS (pg), shared-pages, code, 0,  data+stack, 0\n";
   std::cout<<"$proc-i rchar, wchar, syscr, syscw, read_bytes, write_bytes\n";
@@ -127,14 +151,15 @@ int main(int argc, char *argv[]) {
 // rusage ru;
  time_t t = time(0);
  struct tm * now = localtime( & t );
- std::cout <<"$Start time "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
+ std::cout <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
 
 
- while(exists("/proc/"+pid_s+"/exe"))
+ //while(exists("/proc/"+str_pid+"/exe"))//main loop, executes while the process is running (maybe faster way?)
+ while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
  {
-    printf(("$proc-io "+getio("/proc/"+pid_s+"/io")).c_str());
-    printf(("$proc-mem " + getmem(pid_s)).c_str());
-    printf(("$proc-stat "+getstat(pid_s)).c_str());
+    printf(("$proc-io "+getio("/proc/"+str_pid+"/io")).c_str());
+    printf(("$proc-mem " + getmem(str_pid)).c_str());
+    printf(("$proc-stat "+getstat(str_pid)).c_str());
 
   usleep(delay);
  }
