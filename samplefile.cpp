@@ -8,6 +8,7 @@
 //=============
 //=============
 
+#include <sys/wait.h>
 std::string
 getio(const std::string& path)
 {
@@ -56,7 +57,7 @@ void
 getPiD(std::string& str_pid, std::string& str_pname)
 {
 
- if(str_pid=="")
+ if(str_pid=="")HW
   {
     while(str_pid=="")
     {
@@ -71,6 +72,10 @@ getPiD(std::string& str_pid, std::string& str_pname)
     }
   }
 return;
+}
+
+void handle_sigchld(int sig) {
+  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
 }
 
 int
@@ -114,18 +119,22 @@ main(int argc, char *argv[]) {
       else if(argv[1]!=""){  //launch process from here
       std::cout<<"Launching process "<<configfile<<std::endl;
       std::flush(std::cout);
-
       int pid = fork();
+      if (pid==-1){std::cout<<"Fork Failed somehow!!";}
       if(pid==0)
         {
-        int rc = execl(argv[1], "&");
+        std::cout<<"Launching process"<<'\n';
+        std::cout<<argv[1]<<" "<<argc<<'\n';
 
-        if (rc==-1) std::cout<<"Couldn't launch process "<<configfile<<" Did you have the path right?"<<std::endl;
+        int rc = execvp(argv[1] ,&argv[1]);
+
+        std::cout<<"Output of fork is "<<rc<<std::endl;
+        if (rc==-1) std::cout<<"Error launching process "<<configfile<<" Did you have the path right?"<<std::endl;
         }
       else  //parent process
         {
            std::cout<<"Parent Process";
-           std::string str_name="firefox";//extract name from path
+           std::string str_name=argv[1];//extract name from path
            // Check if process name exists and get PID
            getPiD(str_pid,str_name);
         }
@@ -160,8 +169,10 @@ main(int argc, char *argv[]) {
     printf(("$proc-io "+getio("/proc/"+str_pid+"/io")).c_str());
     printf(("$proc-mem " + getmem(str_pid)).c_str());
     printf(("$proc-stat "+getstat(str_pid)).c_str());
-
-  usleep(delay);
+    signal(SIGCHLD, handle_sigchld ); //Handles the death of the child (with grief)
+    usleep(delay);
  }
 return 0;
 }
+
+
