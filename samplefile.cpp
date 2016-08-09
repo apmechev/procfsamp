@@ -1,6 +1,6 @@
 #include <fstream>         /* std::ifstream */
 #include <iostream>         /* std::cout */
-
+#include <chrono>           /*system_clock::now()*/
 #include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
 #include <sys/stat.h>
@@ -57,7 +57,7 @@ void
 getPiD(std::string& str_pid, std::string& str_pname)
 {
 
- if(str_pid=="")HW
+ if(str_pid=="")
   {
     while(str_pid=="")
     {
@@ -76,6 +76,13 @@ return;
 
 void handle_sigchld(int sig) {
   while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+}
+
+void tsdb_stdout(std::ofstream& outfile,std::string metric="exe.0.null"){
+using namespace std::chrono;
+milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+outfile << "put "+metric+" "+std::to_string(ms.count())+"\n";
+return;
 }
 
 int
@@ -161,17 +168,22 @@ main(int argc, char *argv[]) {
  time_t t = time(0);
  struct tm * now = localtime( & t );
  std::cout <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
-
-
+ std::string command_metric;
+// command_metric<<str_command;
+ std::string metric="exe."+str_pid+"."+str_command;
+ std::ofstream tsdbfile;
+ tsdbfile.open ("myfile");
  //while(exists("/proc/"+str_pid+"/exe"))//main loop, executes while the process is running (maybe faster way?)
  while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
  {
-    printf(("$proc-io "+getio("/proc/"+str_pid+"/io")).c_str());
-    printf(("$proc-mem " + getmem(str_pid)).c_str());
-    printf(("$proc-stat "+getstat(str_pid)).c_str());
+    //printf(("$proc-io "+getio("/proc/"+str_pid+"/io")).c_str());
+    //printf(("$proc-mem " + getmem(str_pid)).c_str());
+    //printf(("$proc-stat "+getstat(str_pid)).c_str());
+    tsdb_stdout(tsdbfile,metric);
     signal(SIGCHLD, handle_sigchld ); //Handles the death of the child (with grief)
     usleep(delay);
  }
+ tsdbfile.close();
 return 0;
 }
 
