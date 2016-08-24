@@ -9,48 +9,86 @@
 //=============
 
 #include <sys/wait.h>
-std::string
-getio(const std::string& path)
+
+
+void tsdb_stdout(std::ofstream& outfile,std::string metric="exe.0.null",std::string data=""){
+using namespace std::chrono;
+milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+outfile << "put "+metric+" "+std::to_string(ms.count())+" "+data+"\n";
+return;
+}
+
+void
+getio(const std::string& path,std::ofstream& tsdbfile,std::string metric)
 {
 
   std::ifstream file(path);
 
   std::string readchars,dummy,wrchars,syscw,syscr,read_bytes,write_bytes;
   file>>dummy>> readchars>>dummy>>wrchars>>dummy>>syscr>>dummy>>syscw>>dummy>>read_bytes>>dummy>>write_bytes;
+  metric+=".io";
+  tsdb_stdout(tsdbfile,metric+".rchar",readchars);
+  tsdb_stdout(tsdbfile,metric+".wchar",wrchars);
+  tsdb_stdout(tsdbfile,metric+".syscr",syscr);
+  tsdb_stdout(tsdbfile,metric+".syscw",syscw);
+  tsdb_stdout(tsdbfile,metric+".read_b",read_bytes);
+  tsdb_stdout(tsdbfile,metric+".write_b",write_bytes);
 
-  std::string result = readchars+" "+wrchars+" "+syscr+" "+syscw+" "+read_bytes+" "+write_bytes+'\n';
-
-  return result;
+  return;
 }
 
-std::string
-getmem(const std::string& pid)//Get memory information (in one block right now)
+void
+getmem(const std::string& pid,std::ofstream& tsdbfile,std::string metric)//Get memory information (in one block right now)
 {
-    std::string path="/proc/"+pid+"/statm";
-    std::ifstream file(path,std::ifstream::binary);
-    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-    return content;
+  metric+=".mem";
+  std::string path="/proc/"+pid+"/statm";
+  std::ifstream file(path,std::ifstream::binary);
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  size_t pos = 0;
+  std::string token;
+  std::string delim=" ";
+  std::string metrics[]={"VmSize","VMRSS","shr-pgs","code","NA","Data_and_stack"};
+  int met_pos=0;
+  while ((pos = content.find(delim)) != std::string::npos) {
+    token = content.substr(0, pos);
+    content.erase(0, pos + delim.length());
+    tsdb_stdout(tsdbfile,metric+"."+metrics[met_pos],token);
+    met_pos+=1;
+}
+    return ;
 }
 
-std::string
-getstat(const std::string& pid)//Get memory information (in one block right now)
+void
+getstat(const std::string& pid,std::ofstream& tsdbfile,std::string metric)//Get memmemory information (in one block right now)
 {
 
-    std::string state,dummy,minflt,mjflt,utime,s_time,nthreads,vsize,rss,iodelay;
+    std::string dummy,minflt,mjflt,utime,s_time,nthreads,vsize,rss,iodelay;
+    char state;
     std::string path="/proc/"+pid+"/stat";
     std::ifstream file(path,std::ifstream::binary);
     file>>dummy>>dummy>>state>>dummy>>dummy>>dummy>>dummy>>dummy>>dummy>>minflt>>dummy>>mjflt>>dummy>>utime>>s_time>>dummy>>dummy>>dummy>>dummy>>nthreads>>dummy>>dummy>>vsize>>rss;
-    std::string content=state+" "+minflt+" "+mjflt+" "+utime+" "+s_time+" "+nthreads+" "+vsize+" "+rss+'\n';
+    metric+=".stat";
+    std::string st_int;
+    switch(state){
+        case 'R':
+        st_int="1";break;
+        case 'S':
+        st_int="2"; break;
+        case 'D':
+        st_int="3"; break;
+        case 'T':
+        st_int="4"; break;
+        default:
+        st_int="0";
 
-    return content;
-}
-
-
-inline bool
-exists (const std::string& name) {
-  struct stat buffer;
-  return (stat (name.c_str(), &buffer) == 0);
+    }
+    tsdb_stdout(tsdbfile,metric+".state",st_int);
+    tsdb_stdout(tsdbfile,metric+".minflt",minflt);
+    tsdb_stdout(tsdbfile,metric+".mjrflt",mjflt);
+    tsdb_stdout(tsdbfile,metric+".utime",utime);
+    tsdb_stdout(tsdbfile,metric+".stime",s_time);
+    tsdb_stdout(tsdbfile,metric+".nthreads",nthreads);
+    return;
 }
 
 void
@@ -78,12 +116,6 @@ void handle_sigchld(int sig) {
   while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
 }
 
-void tsdb_stdout(std::ofstream& outfile,std::string metric="exe.0.null"){
-using namespace std::chrono;
-milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
-outfile << "put "+metric+" "+std::to_string(ms.count())+"\n";
-return;
-}
 
 int
 main(int argc, char *argv[]) {
@@ -173,14 +205,13 @@ main(int argc, char *argv[]) {
  std::string metric="exe."+str_pid+"."+argv[1];
  std::ofstream tsdbfile;
 
- tsdbfile.open ("myfile");
+ tsdbfile.open ("tcollector_proc.out");
  //while(exists("/proc/"+str_pid+"/exe"))//main loop, executes while the process is running (maybe faster way?)
  while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
  {
-    //printf(("$proc-io "+getio("/proc/"+str_pid+"/io")).c_str());
-    //printf(("$proc-mem " + getmem(str_pid)).c_str());
-    //printf(("$proc-stat "+getstat(str_pid)).c_str());
-    tsdb_stdout(tsdbfile,metric);
+    getio("/proc/"+str_pid+"/io",tsdbfile,metric);
+    getmem(str_pid,tsdbfile,metric);
+    getstat(str_pid,tsdbfile,metric);
     signal(SIGCHLD, handle_sigchld ); //Handles the death of the child (with grief)
     usleep(delay);
  }
