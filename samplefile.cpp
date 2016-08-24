@@ -170,8 +170,9 @@ main(int argc, char *argv[]) {
  std::cout <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
  std::string command_metric;
 // command_metric<<str_command;
- std::string metric="exe."+str_pid+"."+str_command;
+ std::string metric="exe."+str_pid+"."+argv[1];
  std::ofstream tsdbfile;
+
  tsdbfile.open ("myfile");
  //while(exists("/proc/"+str_pid+"/exe"))//main loop, executes while the process is running (maybe faster way?)
  while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
