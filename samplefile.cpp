@@ -162,66 +162,13 @@ int
 main(int argc, char *argv[]) {
  std::string str_pid,configfile="",str_pname="",delays,str_command,metric;
  int delay=1000000;
-/* if ( argc < 2 ){
-    std::cout<<"usage: "<< argv[0] <<" PID configfile \n";
-    return 0;
-    }
- else
-  { if(isdigit(argv[1][0])) //Process ID number
-    {
-      str_pid= argv[1];
-    }
-    else                    //Either *.cfg file or process launch (NOT implemented)
-    {
-     configfile=argv[1];
-     if (configfile.find(".cfg")!=std::string::npos) //if a configure file is specified
-      {
-       std::cerr<<"Launching from cfg file"<<std::endl;
-       
-      }
-     else if(argv[1]!=""){  //launch process from here
-      std::cout<<"Launching from command: "<<configfile<<std::endl;
-      std::flush(std::cout);
-      int pid = fork();
-      if (pid==-1){std::cout<<"Fork Failed somehow!!";}
-      if(pid==0)
-        {
-        std::cerr<<"Launching process" ;
-
-        int rc = execvp(argv[1] ,&argv[1]);
-
-        std::cerr<<"Output of fork is "<<rc<<std::endl;
-        if (rc==-1) std::cout<<"Error launching process "<<configfile<<" Did you have the path right?"<<std::endl;
-        }
-      else  //parent process
-        {
-           std::cerr<<"Parent Process"<<'\n';
-           std::string str_name=argv[1];//extract name from path
-           // Check if process name exists and get PID
-           configfile=basename(const_cast<char*>(str_name.c_str())); //basename is needed if program from path in PID
-           std::cerr<<"Capturing PID of"<<configfile<<'\n';
-           getPiD(str_pid,configfile);
-
-
-        }
-      }
-      else //otherwise the process name to track
-      {
-        str_pname=argv[1];
-        configfile=argv[1];
-        std::cerr<<str_pname;
-        std::flush(std::cout);
-      }
-    }
-  }
-*/
  while(1)
  {
   static struct option long_options []=
    {
     {"pid",   required_argument,    0,   'p'},
     {"pname", required_argument,    0,   'n'},
-    {"launch",required_argument,   0,   'l'},
+    {"launch",required_argument,    0,   'l'},
     {"metric",required_argument,    0,   'm'},
     {"delay", required_argument,    0,   'd'},
     {"config",required_argument,    0,   'c'},
@@ -231,60 +178,62 @@ main(int argc, char *argv[]) {
   int option_index = 0;
   x = getopt_long (argc, argv, "p:n:l:m:d:c:",
                        long_options, &option_index);
+  
   if (x == -1)
         break;
-  switch (x)
-        {
-        case 0:
-          /* If this option set a flag, do nothing else now. */
-          if (long_options[option_index].flag != 0)
-            break;
-          printf ("option %s", long_options[option_index].name);
-          if (optarg)
-            printf (" with arg %s", optarg);
-          printf ("\n");
-          break;
+
+   switch (x)
+         {
+         case 0:
+           /* If this option set a flag, do nothing else now. */
+           if (long_options[option_index].flag != 0)
+             break;
+           printf ("option %s", long_options[option_index].name);
+           if (optarg)
+             printf (" with arg %s", optarg);
+           printf ("\n");
+           break;
+  
  
-
-        case 'p':
-          std::cerr<<"Process_ID set as "<< optarg <<std::endl;
-	  str_pid=optarg;
-          break;
-
-        case 'n':
-          std::cerr<<"Process name set as "<<optarg<<std::endl;
-	  str_pname=optarg;
-          break;
-
-        case 'l':
-          std::cerr<<"Launching process   "<<optarg<<std::endl;
-          str_pname=optarg;
-          break;
-
-        case 'd':
-          std::cerr<<"Delay set as "<< optarg<<std::endl;
-          delays=optarg;
-          delay=std::stoi(delays);
-          break;
-
-        case 'm':
-          std::cerr<<"OpenTSDB metric set as "<< optarg<<std::endl;
-	  metric=optarg;
-          break;
-
-        case 'c':
-          std::cerr<<"Config File is "<<optarg<<std::endl;
-          configfile=optarg;
-	  launch_from_config(configfile,delays,delay,str_pname, str_pid);
-          break;
-
-        case '?':
-          /* getopt_long already printed an error message. */
-          break;
-
-        default:
-          break;
-        }
+         case 'p':
+           std::cerr<<"Process_ID set as "<< optarg <<std::endl;
+ 	  str_pid=optarg;
+           break;
+ 
+         case 'n':
+           std::cerr<<"Process name set as "<<optarg<<std::endl;
+ 	  str_pname=optarg;
+           break;
+ 
+         case 'l':
+           std::cerr<<"Launching process   "<<optarg<<std::endl;
+           str_pname=optarg;
+           break;
+ 
+         case 'd':
+           std::cerr<<"Delay set as "<< optarg<<std::endl;
+           delays=optarg;
+           delay=1000*std::stoi(delays);
+           break;
+ 
+         case 'm':
+           std::cerr<<"OpenTSDB metric set as "<< optarg<<std::endl;
+ 	  metric=optarg;
+           break;
+ 
+         case 'c':
+           std::cerr<<"Config File is "<<optarg<<std::endl;
+           configfile=optarg;
+ 	  launch_from_config(configfile,delays,delay,str_pname, str_pid);
+           break;
+ 
+         case '?':
+           exit(1);
+           break;
+ 
+         default:
+           break;
+         }
  };
 
 
