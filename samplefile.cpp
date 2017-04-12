@@ -5,8 +5,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include<csignal>       /*kill()*/
-#include <algorithm>        /*remove_if*/
-#include <libgen.h>        /*basename()*/
+#include <algorithm>    /*remove_if*/
+#include <libgen.h>     /*basename()*/
+#include <getopt.h>	/*option*/
 //=============
 //=============
 
@@ -20,7 +21,8 @@ tsdb_stdout(std::fstream& outfile,std::string metric="exe.0.null",std::string da
   using namespace std::chrono;
   milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
   outfile << "put "+metric+" "+std::to_string(ms.count())+" "+data+"\n";
-  //std::cout<<"put "+metric+" "+std::to_string(ms.count())+" "+data+"\n";
+  std::cout<<metric+" "+std::to_string(ms.count())+" "+data+"\n";
+  std::flush(std::cout);
 return;
 }
 
@@ -34,7 +36,6 @@ getio(const std::string& path,std::fstream& tsdbfile,std::string metric)
   file>>dummy>> readchars>>dummy>>wrchars>>dummy>>syscr>>dummy>>syscw>>dummy>>read_bytes>>dummy>>write_bytes;
   metric+=".io";
   tsdbfile.open ("tcollector_proc.out",std::fstream::app);
-
   tsdb_stdout(tsdbfile,metric+".rchar",readchars);
   tsdb_stdout(tsdbfile,metric+".wchar",wrchars);
   tsdb_stdout(tsdbfile,metric+".syscr",syscr);
@@ -108,12 +109,12 @@ getstat(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get m
 void
 getPiD(std::string& str_pid, std::string& str_pname)
 {
- /*Use pidof to find the Process ID of str_pname*/
+ /*Use pidof to find the Process ID of str_pname, puts in addres of str_pid*/
  if(str_pid=="")
   {
     while(str_pid=="")
     {
-      FILE* fpidof = popen(("pgrep -u `id -u`"+str_pname).c_str(),"r"); //Replace pidof with pgrep to get only current user
+      FILE* fpidof = popen(("pgrep -u `id -u` "+str_pname).c_str(),"r"); //Replace pidof with pgrep to get only current user //ok done, u happy?
       if (fpidof)
       {
         int p=0;
@@ -131,11 +132,37 @@ void handle_sigchld(int sig) {
 }
 
 
+int launch_from_config(std::string configfile,std::string& delays,int& delay, std::string& str_pname, std::string& str_pid){
+	/*Taking this out of the main, but basically launches from the config file and updates variables*/
+       std::cerr<<"Launching from cfg file"<<std::endl;
+       std::ifstream infile(configfile);
+       if (infile.good())
+        {
+         getline(infile,str_pname);
+         getline(infile,delays);
+        }
+        if (delays=="")
+        {
+         delay=1000000;
+        }
+        else
+        {
+         delay=1000*std::stoi(std::string(delays));
+        }
+       infile.close();
+       // Check if process name exists and get PID
+       getPiD(str_pid,str_pname); //this needs fixing
+//       configfile=str_pname;   //This shold probably be removed
+       //
+    return 0;
+}
+
+
 int
 main(int argc, char *argv[]) {
- std::string str_pid,configfile="",str_pname="",delays,str_command;
+ std::string str_pid,configfile="",str_pname="",delays,str_command,metric;
  int delay=1000000;
- if ( argc < 2 ){
+/* if ( argc < 2 ){
     std::cout<<"usage: "<< argv[0] <<" PID configfile \n";
     return 0;
     }
@@ -150,27 +177,9 @@ main(int argc, char *argv[]) {
      if (configfile.find(".cfg")!=std::string::npos) //if a configure file is specified
       {
        std::cerr<<"Launching from cfg file"<<std::endl;
-       std::ifstream infile(configfile);
-       if (infile.good())
-        {
-         getline(infile,str_pname);
-         getline(infile,delays);
-        }
-        if (delays=="")
-        {
-         delay=1000000;
-        }
-        else
-        {
-         delay=1000*std::stoi(delays);
-        }
-       infile.close();
-       // Check if process name exists and get PID
-       getPiD(str_pid,str_pname);
-       configfile=str_pname;
+       
       }
-
-      else if(argv[1]!=""){  //launch process from here
+     else if(argv[1]!=""){  //launch process from here
       std::cout<<"Launching from command: "<<configfile<<std::endl;
       std::flush(std::cout);
       int pid = fork();
@@ -205,9 +214,83 @@ main(int argc, char *argv[]) {
       }
     }
   }
+*/
+ while(1)
+ {
+  static struct option long_options []=
+   {
+    {"pid",   required_argument,    0,   'p'},
+    {"pname", required_argument,    0,   'n'},
+    {"launch",required_argument,   0,   'l'},
+    {"metric",required_argument,    0,   'm'},
+    {"delay", required_argument,    0,   'd'},
+    {"config",required_argument,    0,   'c'},
+    {0, 0, 0, 0}};
+
+  int x; 
+  int option_index = 0;
+  x = getopt_long (argc, argv, "p:n:l:m:d:c:",
+                       long_options, &option_index);
+  if (x == -1)
+        break;
+  switch (x)
+        {
+        case 0:
+          /* If this option set a flag, do nothing else now. */
+          if (long_options[option_index].flag != 0)
+            break;
+          printf ("option %s", long_options[option_index].name);
+          if (optarg)
+            printf (" with arg %s", optarg);
+          printf ("\n");
+          break;
+ 
+
+        case 'p':
+          std::cerr<<"Process_ID set as "<< optarg <<std::endl;
+	  str_pid=optarg;
+          break;
+
+        case 'n':
+          std::cerr<<"Process name set as "<<optarg<<std::endl;
+	  str_pname=optarg;
+          break;
+
+        case 'l':
+          std::cerr<<"Launching process   "<<optarg<<std::endl;
+          str_pname=optarg;
+          break;
+
+        case 'd':
+          std::cerr<<"Delay set as "<< optarg<<std::endl;
+          delays=optarg;
+          delay=std::stoi(delays);
+          break;
+
+        case 'm':
+          std::cerr<<"OpenTSDB metric set as "<< optarg<<std::endl;
+	  metric=optarg;
+          break;
+
+        case 'c':
+          std::cerr<<"Config File is "<<optarg<<std::endl;
+          configfile=optarg;
+	  launch_from_config(configfile,delays,delay,str_pname, str_pid);
+          break;
+
+        case '?':
+          /* getopt_long already printed an error message. */
+          break;
+
+        default:
+          break;
+        }
+ };
+
+
 
   std::cerr<<"$proc "<<str_pid<<" "<<str_pname<< " from "<<configfile<<" with delay (ms) "<<delay/1000<<std::endl;
-
+//  return 0;
   std::ifstream filec("/proc/"+str_pid+"/cmdline");
   filec>>str_command;
   std::cerr<<"$proc cmd: "<<str_command<<std::endl;
@@ -218,11 +301,14 @@ main(int argc, char *argv[]) {
 // rusage ru;
  time_t t = time(0);
  struct tm * now = localtime( & t );
- std::cerr <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl;
- std::string command_metric;
-// command_metric<<str_command;
+ std::cerr <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl; 
  std::remove_if(configfile.begin(), configfile.end(), isspace);
- std::string metric="exe."+str_pid+"."+configfile;
+ if (metric.empty()){
+  metric="exe."+str_pname+"."+str_pid;}
+ else {
+  metric="exe."+metric+"."+str_pid;}
+
+
  std::fstream tsdbfile;
 
  while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
