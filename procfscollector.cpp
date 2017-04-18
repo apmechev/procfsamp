@@ -4,7 +4,7 @@
 #include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
 #include <sys/stat.h>
-#include<csignal>       /*kill()*/
+#include <csignal>       /*kill()*/
 #include <algorithm>    /*remove_if*/
 #include <libgen.h>     /*basename()*/
 #include <getopt.h>	/*option*/
