@@ -114,6 +114,7 @@ void strace_loop(std::string command, std::map<std::string,int> &dict, std::stri
 
     std::string k=iter->first;
     if (k.find("tached")!=std::string::npos){continue;} //ignores attach and detach tags
+    if (k.find("SIGCHLD")!=std::string::npos){continue;} //ignores attach and detach tags
     int v = iter->second;
     using namespace std::chrono;
     std::chrono::milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
