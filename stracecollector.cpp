@@ -1,7 +1,7 @@
 #include <fstream>         /* std::ifstream */
 #include <iostream>         /* std::cout */
 #include <string.h>            /*strcat*/
-//##include <chrono>           /*system_clock::now()*/
+#include <chrono>           /*system_clock::now()*/
 //#include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
 //#include <sys/stat.h>
@@ -18,19 +18,19 @@
 
 #include <sys/wait.h>
 
-/*
+
 void
 tsdb_stdout(std::fstream& outfile,std::string metric="exe.0.null",std::string data=""){
-  Writes metric, stamp and data to a file
-    TODO: Make this also sendable through std::out for tcollector
+  //Writes metric, stamp and data to a file
+  //  TODO: Make this also sendable through std::out for tcollector
   using namespace std::chrono;
-  milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+  std::chrono::milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
   outfile << "put "+metric+" "+std::to_string(ms.count())+" "+data+"\n";
   std::cout<<metric+" "+std::to_string(ms.count())+" "+data+"\n";
   std::flush(std::cout);
 return;
 }
-*/
+
 
 void incr_dict(std::map<std::string,int> &dict, std::string call_name){
  if (dict.find(call_name)!=dict.end())
@@ -54,29 +54,6 @@ std::string exec(const char *cmd, std::map<std::string,int> &dict) {
     return result;
 }
 
-void
-getmem(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get memory information (in one block right now)
-{
-  metric+=".mem";
-  std::string path="/proc/"+pid+"/statm";
-  std::ifstream file(path,std::ifstream::binary);
-  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-  size_t pos = 0;
-  std::string token;
-  std::string delim=" ";
-  std::string metrics[]={"VmSize","VMRSS","shr-pgs","code","NA","Data_and_stack"};
-  int met_pos=0;
-  tsdbfile.open ("tcollector_proc.out",std::fstream::app);
-
-  while ((pos = content.find(delim)) != std::string::npos) {
-    token = content.substr(0, pos);
-    content.erase(0, pos + delim.length());
-   // tsdb_stdout(tsdbfile,metric+"."+metrics[met_pos],token);
-    met_pos+=1;
- }
-    tsdbfile.close();
-    return ;
-}
 
 void
 getPiD(std::string& str_pid, std::string& str_pname)
@@ -137,7 +114,9 @@ void strace_loop(std::string command, std::map<std::string,int> &dict, std::stri
     std::string k=iter->first;
     if (k.find("tached")!=std::string::npos){continue;} //ignores attach and detach tags
     int v = iter->second;
-    std::cout<<metric<<"."<<k<<" "<<v<<std::endl;
+    using namespace std::chrono;
+    std::chrono::milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+    std::cout<<metric<<"."<<k<<" "<<std::to_string(ms.count())<<" "<<v<<std::endl;
     iter->second=0;
    }
   return; 
