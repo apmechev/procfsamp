@@ -15,15 +15,18 @@ LOFARTimer.o:
 	g++ -Wall -fexceptions -g -std=c++11 -Iinclude -c src/LOFARTimer.cc -o $(OBJDIR)/LOFARTimer.o
 
 procfs-sampler: $(PROCOBJ)
+	mkdir -p bin/Debug/
 	g++ -O2 -o bin/Debug/procfs-sampler $(OBJECTS)  -lrt
 
 stracecollector.o:
 	g++ -Wall -fexceptions -g -std=c++11 -Iinclude -c stracecollector.cpp -o $(OBJDIR)/stracecollector.o
 
 stracecollector: $(STRAOBJ)
+	mkdir -p bin/Debug/
 	g++ -O2 -o bin/Debug/strace-sampler $(OBJECTS) -lrt 
 
 
 clean:
 	rm -rf $(OBJDIR)/*.o
+	rm -rf bin/Debug/*
 

@@ -1,5 +1,6 @@
 #include <fstream>         /* std::ifstream */
 #include <iostream>         /* std::cout */
+#include <string.h>            /*strcat*/
 //##include <chrono>           /*system_clock::now()*/
 //#include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
@@ -42,10 +43,13 @@ void incr_dict(std::map<std::string,int> &dict, std::string call_name){
  return;
 }
 
-std::string exec(const char* cmd, std::map<std::string,int> &dict) {
+std::string exec(const char *cmd, std::map<std::string,int> &dict) {
     std::array<char, 256> buffer;
     std::string result, tmp;
-    std::shared_ptr<FILE> pipe(popen("timeout 3 strace -p 8598 2>&1", "r"), pclose);//strace -p 8598
+    std::string cmd1="timeout 3 strace -p ";
+    std::string cmd3=" 2>&1";
+    std::string command=cmd1+cmd+cmd3;
+    std::shared_ptr<FILE> pipe(popen(command.c_str(), "r"), pclose);//strace -p 8598
     if (!pipe) throw std::runtime_error("popen() failed!");
     while (!feof(pipe.get())) {
         if (fgets(buffer.data(), 256, pipe.get()) != NULL) 
