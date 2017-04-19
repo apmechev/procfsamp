@@ -1,14 +1,14 @@
 #include <fstream>         /* std::ifstream */
 #include <iostream>         /* std::cout */
-#include <chrono>           /*system_clock::now()*/
-#include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
+//##include <chrono>           /*system_clock::now()*/
+//#include "include/GUTimer.h"        /*Timers: time_h, rdtsc, chrono_hr, ctime, LOFAR_timer*/
 #include <unistd.h>
-#include <sys/stat.h>
+//#include <sys/stat.h>
 #include <csignal>       /*kill()*/
 #include <algorithm>    /*remove_if*/
 #include <libgen.h>     /*basename()*/
 #include <getopt.h>	/*option*/
-#include <vector>	/*vector for execvp*/
+#include <map>	/*vector for execvp*/
 #include <array>
 #include <memory>
 
@@ -17,11 +17,11 @@
 
 #include <sys/wait.h>
 
-
+/*
 void
 tsdb_stdout(std::fstream& outfile,std::string metric="exe.0.null",std::string data=""){
-  /*Writes metric, stamp and data to a file
-    TODO: Make this also sendable through std::out for tcollector*/
+  Writes metric, stamp and data to a file
+    TODO: Make this also sendable through std::out for tcollector
   using namespace std::chrono;
   milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
   outfile << "put "+metric+" "+std::to_string(ms.count())+" "+data+"\n";
@@ -29,41 +29,33 @@ tsdb_stdout(std::fstream& outfile,std::string metric="exe.0.null",std::string da
   std::flush(std::cout);
 return;
 }
+*/
 
 
-std::string exec(const char* cmd) {
-    std::array<char, 128> buffer;
-    std::string result;
-    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+
+
+void incr_dict(std::map<std::string,int> &dict, std::string call_name){
+ if (dict.find(call_name)!=dict.end())
+  {dict[call_name]++;}
+ else 
+  {dict.insert(std::pair<std::string,int>(call_name,1));}
+ return;
+}
+
+std::string exec(const char* cmd, std::map<std::string,int> &dict) {
+    std::array<char, 256> buffer;
+    std::string result, tmp;
+    std::shared_ptr<FILE> pipe(popen("timeout 3 strace -p 8598 2>&1", "r"), pclose);//strace -p 8598
     if (!pipe) throw std::runtime_error("popen() failed!");
     while (!feof(pipe.get())) {
-        if (fgets(buffer.data(), 128, pipe.get()) != NULL)
-            result += buffer.data();
+        if (fgets(buffer.data(), 256, pipe.get()) != NULL) 
+            tmp = buffer.data();
+            incr_dict(dict , tmp.substr(0, tmp.find("(", 0)));
+            result+= tmp.substr(0, tmp.find("(", 0))+"\n";
     }
     return result;
 }
 
-/*
-void
-getio(const std::string& path,std::fstream& tsdbfile,std::string metric)
-{
-
-  std::ifstream file(path);
-
-  std::string readchars,dummy,wrchars,syscw,syscr,read_bytes,write_bytes;
-  file>>dummy>> readchars>>dummy>>wrchars>>dummy>>syscr>>dummy>>syscw>>dummy>>read_bytes>>dummy>>write_bytes;
-  metric+=".io";
-  tsdbfile.open ("tcollector_proc.out",std::fstream::app);
-  tsdb_stdout(tsdbfile,metric+".rchar",readchars);
-  tsdb_stdout(tsdbfile,metric+".wchar",wrchars);
-  tsdb_stdout(tsdbfile,metric+".syscr",syscr);
-  tsdb_stdout(tsdbfile,metric+".syscw",syscw);
-  tsdb_stdout(tsdbfile,metric+".read_b",read_bytes);
-  tsdb_stdout(tsdbfile,metric+".write_b",write_bytes);
-  tsdbfile.close();
-  return;
-}
-*/
 void
 getmem(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get memory information (in one block right now)
 {
@@ -81,7 +73,7 @@ getmem(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get me
   while ((pos = content.find(delim)) != std::string::npos) {
     token = content.substr(0, pos);
     content.erase(0, pos + delim.length());
-    tsdb_stdout(tsdbfile,metric+"."+metrics[met_pos],token);
+   // tsdb_stdout(tsdbfile,metric+"."+metrics[met_pos],token);
     met_pos+=1;
  }
     tsdbfile.close();
@@ -113,49 +105,16 @@ getstat(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get m
 
     }
     tsdbfile.open ("tcollector_proc.out",std::fstream::app);
-    tsdb_stdout(tsdbfile,metric+".state",st_int);
-    tsdb_stdout(tsdbfile,metric+".minflt",minflt);
-    tsdb_stdout(tsdbfile,metric+".mjrflt",mjflt);
-    tsdb_stdout(tsdbfile,metric+".utime",utime);
-    tsdb_stdout(tsdbfile,metric+".stime",s_time);
-    tsdb_stdout(tsdbfile,metric+".nthreads",nthreads);
+//    tsdb_stdout(tsdbfile,metric+".state",st_int);
+//    tsdb_stdout(tsdbfile,metric+".minflt",minflt);
+//    tsdb_stdout(tsdbfile,metric+".mjrflt",mjflt);
+//    tsdb_stdout(tsdbfile,metric+".utime",utime);
+//    tsdb_stdout(tsdbfile,metric+".stime",s_time);
+//    tsdb_stdout(tsdbfile,metric+".nthreads",nthreads);
     tsdbfile.close();
 
     return;
 }
-
-int
-launch_process(std::string str_prog_name="/usr/bin/top")
-{
- std::vector<char *> cmd; // stackoverflow.com/questions/5846934/how-to-pass-a-vector-to-execvp
- std::stringstream s(str_prog_name);
- std::string word="";
-
- for (int i = 0; s >> word; i++)
- {
-  char* chrword=new char[ word.size() ];
-  std::strncpy(chrword,word.c_str(),word.size());
-  cmd.push_back(chrword);
- }
-
-// cmd.push_back("echo");
-//cmd.push_back("echo");
-// cmd.push_back("echo");
- cmd.push_back(NULL);
-
- char **argsx = &cmd[0];
- int pid = fork();
- if (pid==-1){std::cerr<<"Fork Failed somehow!!";}
- if (pid==0) //only true for the forked process->launch
-  {std::cerr<<"Launching process" ;
-   int rc = execvp(argsx[0],argsx);
-   std::cerr<<"Output of fork is "<<rc<<std::endl;
-   if (rc==-1) std::cout<<"Error launching process "<<argsx[0]<<" Did you have the path right?"<<std::endl;
-  }
-
- return pid;
-}
-
 
 void
 getPiD(std::string& str_pid, std::string& str_pname)
@@ -287,25 +246,19 @@ main(int argc, char *argv[]) {
          }
  };
 
-
-
   std::cerr<<"$proc "<<str_pid<<" "<<str_pname<< " from "<<configfile<<" with delay (ms) "<<delay/1000<<std::endl;
   getPiD(str_pid,str_pname);
   if (str_launch!=""){
    std::cerr<< "launching process "<< str_launch<<std::endl;
-   str_pid=std::to_string(launch_process(str_launch));
+//   str_pid=std::to_string(launch_process(str_launch));
    str_pname=str_launch;
   }
 
-//  return 0;
+
   std::ifstream filec("/proc/"+str_pid+"/cmdline");
   filec>>str_command;
   std::cerr<<"$proc cmd: "<<str_command<<std::endl;
-
-  std::cerr<<"$proc-m VmSize(pg), VMRSS (pg), shared-pages, code, 0,  data+stack, 0\n";
-  std::cerr<<"$proc-i rchar, wchar, syscr, syscw, read_bytes, write_bytes\n";
-  std::cerr<<"$proc-s state, minflt, mjflt, utime ,s_time, nthreads, VMSize, RSS(pages)'\n';";
-// rusage ru;
+  // rusage ru;
   time_t t = time(0);
   struct tm * now = localtime( & t );
   std::cerr <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl; 
@@ -314,17 +267,20 @@ main(int argc, char *argv[]) {
    metric="exe."+str_pname+"."+str_pid;}
   else {
    metric="exe."+metric+"."+str_pid;}
-
+  std::map <std::string, int > dict;
   std::fstream tsdbfile;
 
- while(not(kill(std::stoi(str_pid),NULL))) //continues if pid exists, not sure if works fasters
- {
-    getmem(str_pid,tsdbfile,metric);
-    getstat(str_pid,tsdbfile,metric);
-    signal(SIGCHLD, handle_sigchld ); //Handles the death of the child (with grief)
-    usleep(delay);
- }
-return 0;
+  std::string pid; 
+  std::cin >> pid;
+  exec(pid.c_str(),dict);
+  for(std::map<std::string,int>::iterator iter = dict.begin(); iter != dict.end(); ++iter)
+  { 
+    std::string k=iter->first;
+    int v = iter->second;
+    std::cout<<k<<" "<<v<<std::endl;
+   }
+
+  return 0;
 }
 
 
