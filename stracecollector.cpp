@@ -48,6 +48,7 @@ std::string exec(const char *cmd, std::map<std::string,int> &dict) {
     while (!feof(pipe.get())) {
         if (fgets(buffer.data(), 256, pipe.get()) != NULL) 
             tmp = buffer.data();
+            if (tmp.find("not permitted")!=std::string::npos){throw 91;} //ignores attach and detach tags
             incr_dict(dict , tmp.substr(0, tmp.find("(", 0)));
             result+= tmp.substr(0, tmp.find("(", 0))+"\n";
     }
@@ -239,16 +240,17 @@ main(int argc, char *argv[]) {
   std::string cmd1="timeout "+std::to_string(run_delay)+" strace -p ";
   std::string cmd3=" 2>&1";
   std::string command=cmd1+str_pid+cmd3;
-
-  if (delay<0 ){
-  strace_loop(command, dict, metric);}
-  else if (delay==0 or delay<run_delay){
+  try{
+   if (delay<0 ){
+    strace_loop(command, dict, metric);}
+   else if (delay==0 or delay<run_delay){
     while(not(kill(std::stoi(str_pid),NULL))){
-        strace_loop(command, dict, metric);}}
-  else { while(not(kill(std::stoi(str_pid),NULL))){
-        strace_loop(command, dict, metric);
-        usleep(delay*1000000);}}
-  
+      strace_loop(command, dict, metric);}}
+   else { while(not(kill(std::stoi(str_pid),NULL))){
+      strace_loop(command, dict, metric);
+      usleep(delay*1000000);}}
+  }
+  catch(int e ){std::cerr<<"could not attach strace: Operation not permitted"<<std::endl;return -1;}
   return 0;
 }
 
