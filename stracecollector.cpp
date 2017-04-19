@@ -32,9 +32,6 @@ return;
 }
 */
 
-
-
-
 void incr_dict(std::map<std::string,int> &dict, std::string call_name){
  if (dict.find(call_name)!=dict.end())
   {dict[call_name]++;}
@@ -46,10 +43,7 @@ void incr_dict(std::map<std::string,int> &dict, std::string call_name){
 std::string exec(const char *cmd, std::map<std::string,int> &dict) {
     std::array<char, 256> buffer;
     std::string result, tmp;
-    std::string cmd1="timeout 3 strace -p ";
-    std::string cmd3=" 2>&1";
-    std::string command=cmd1+cmd+cmd3;
-    std::shared_ptr<FILE> pipe(popen(command.c_str(), "r"), pclose);//strace -p 8598
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);//strace -p 8598
     if (!pipe) throw std::runtime_error("popen() failed!");
     while (!feof(pipe.get())) {
         if (fgets(buffer.data(), 256, pipe.get()) != NULL) 
@@ -135,12 +129,25 @@ int launch_from_config(std::string configfile,std::string& delays,int& delay, st
     return 0;
 }
 
+void strace_loop(std::string command, std::map<std::string,int> &dict, std::string metric){
+  exec(command.c_str(),dict);
+  for(std::map<std::string,int>::iterator iter = dict.begin(); iter != dict.end(); ++iter)
+  {
+
+    std::string k=iter->first;
+    if (k.find("tached")!=std::string::npos){continue;} //ignores attach and detach tags
+    int v = iter->second;
+    std::cout<<metric<<"."<<k<<" "<<v<<std::endl;
+    iter->second=0;
+   }
+  return; 
+}
 
 int
 main(int argc, char *argv[]) {
  std::string str_pid,configfile="",str_launch="",str_pname="",delays,str_command,metric;
- int delay=1000000;
- while(1)
+ int run_delay=1,delay=0; //delay controls looping (each second, 10 sec, etc)
+ while(1)                 //whereas run_delay is how long to trace for
  {
   static struct option long_options []=
    {
@@ -150,11 +157,12 @@ main(int argc, char *argv[]) {
     {"metric",required_argument,    0,   'm'},
     {"delay", required_argument,    0,   'd'},
     {"config",required_argument,    0,   'c'},
+    {"strace_delay",required_argument,    0,   'r'},
     {0, 0, 0, 0}};
 
   int x; 
   int option_index = 0;
-  x = getopt_long (argc, argv, "p:n:l:m:d:c:",
+  x = getopt_long (argc, argv, "p:n:l:m:d:c:r:",
                        long_options, &option_index);
   
   if (x == -1)
@@ -188,10 +196,10 @@ main(int argc, char *argv[]) {
            str_launch=optarg; 
            break;
  
-         case 'd':
-           std::cerr<<"Delay set as "<< optarg<<std::endl;
+         case 'r':
+           std::cerr<<"strace sampling time  set as "<< optarg<<std::endl;
            delays=optarg;
-           delay=1000*std::stoi(delays);
+           run_delay=std::stoi(delays);
            break;
  
          case 'm':
@@ -204,8 +212,19 @@ main(int argc, char *argv[]) {
            configfile=optarg;
  	   launch_from_config(configfile,delays,delay,str_pname, str_pid);
            break;
- 
+        case 'd':
+            int s;
+            s=std::stoi(optarg);
+            switch (s){
+                case -1:
+                    std::cerr<<"Running once "<<std::endl;delay=-1;break;
+                case 0:
+                    std::cerr<<"Running continuously"<<std::endl;delay=0; break;
+                default:
+                    std::cerr<<"Looping every "<<optarg<<" seconds"<<std::endl;delay=s;break;
+            };break;
          case '?':
+            std::cout<<"???";
            exit(1);
            break;
  
@@ -214,11 +233,10 @@ main(int argc, char *argv[]) {
          }
  };
 
-  std::cerr<<"$proc "<<str_pid<<" "<<str_pname<< " from "<<configfile<<" with delay (ms) "<<delay/1000<<std::endl;
+  std::cerr<<"$proc "<<str_pid<<" "<<str_pname<< " from "<<configfile<<" with delay (s) "<<delay<<std::endl;
   getPiD(str_pid,str_pname);
   if (str_launch!=""){
    std::cerr<< "launching process "<< str_launch<<std::endl;
-//   str_pid=std::to_string(launch_process(str_launch));
    str_pname=str_launch;
   }
 
@@ -227,25 +245,31 @@ main(int argc, char *argv[]) {
   filec>>str_command;
   std::cerr<<"$proc cmd: "<<str_command<<std::endl;
   // rusage ru;
+
   time_t t = time(0);
   struct tm * now = localtime( & t );
   std::cerr <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl; 
   std::remove_if(configfile.begin(), configfile.end(), isspace);
   if (metric.empty()){
-   metric="exe."+str_pname+"."+str_pid;}
+    metric="exe."+str_pname+"."+str_pid+".strace";}
   else {
-   metric="exe."+metric+"."+str_pid;}
+    metric="exe."+metric+"."+str_pid+".strace";}
   std::map <std::string, int > dict;
-  std::fstream tsdbfile;
-  
-  exec(str_pid.c_str(),dict);
-  for(std::map<std::string,int>::iterator iter = dict.begin(); iter != dict.end(); ++iter)
-  { 
-    std::string k=iter->first;
-    int v = iter->second;
-    std::cout<<k<<" "<<v<<std::endl;
-   }
+  std::fstream tsdbfile; 
 
+  std::string cmd1="timeout "+std::to_string(run_delay)+" strace -p ";
+  std::string cmd3=" 2>&1";
+  std::string command=cmd1+str_pid+cmd3;
+
+  if (delay<0 ){
+  strace_loop(command, dict, metric);}
+  else if (delay==0 or delay<run_delay){
+    while(not(kill(std::stoi(str_pid),NULL))){
+        strace_loop(command, dict, metric);}}
+  else { while(not(kill(std::stoi(str_pid),NULL))){
+        strace_loop(command, dict, metric);
+        usleep(delay*1000000);}}
+  
   return 0;
 }
 
