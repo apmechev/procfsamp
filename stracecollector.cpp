@@ -85,42 +85,6 @@ getmem(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get me
 }
 
 void
-getstat(const std::string& pid,std::fstream& tsdbfile,std::string metric)//Get memmemory information (in one block right now)
-{
-
-    std::string dummy,minflt,mjflt,utime,s_time,nthreads,vsize,rss,iodelay;
-    char state;
-    std::string path="/proc/"+pid+"/stat";
-    std::ifstream file(path,std::ifstream::binary);
-    file>>dummy>>dummy>>state>>dummy>>dummy>>dummy>>dummy>>dummy>>dummy>>minflt>>dummy>>mjflt>>dummy>>utime>>s_time>>dummy>>dummy>>dummy>>dummy>>nthreads>>dummy>>dummy>>vsize>>rss;
-    metric+=".stat";
-    std::string st_int;
-    switch(state){
-        case 'R':
-        st_int="1";break;
-        case 'S':
-        st_int="2"; break;
-        case 'D':
-        st_int="3"; break;
-        case 'T':
-        st_int="4"; break;
-        default:
-        st_int="0";
-
-    }
-    tsdbfile.open ("tcollector_proc.out",std::fstream::app);
-//    tsdb_stdout(tsdbfile,metric+".state",st_int);
-//    tsdb_stdout(tsdbfile,metric+".minflt",minflt);
-//    tsdb_stdout(tsdbfile,metric+".mjrflt",mjflt);
-//    tsdb_stdout(tsdbfile,metric+".utime",utime);
-//    tsdb_stdout(tsdbfile,metric+".stime",s_time);
-//    tsdb_stdout(tsdbfile,metric+".nthreads",nthreads);
-    tsdbfile.close();
-
-    return;
-}
-
-void
 getPiD(std::string& str_pid, std::string& str_pname)
 {
  /*Use pidof to find the Process ID of str_pname, puts in addres of str_pid*/
@@ -211,12 +175,12 @@ main(int argc, char *argv[]) {
  
          case 'p':
            std::cerr<<"Process_ID set as "<< optarg <<std::endl;
- 	  str_pid=optarg;
+ 	   str_pid=optarg;
            break;
  
          case 'n':
            std::cerr<<"Process name set as "<<optarg<<std::endl;
- 	  str_pname=optarg;
+ 	   str_pname=optarg;
            break;
  
          case 'l': //doesnt work fully
@@ -273,10 +237,8 @@ main(int argc, char *argv[]) {
    metric="exe."+metric+"."+str_pid;}
   std::map <std::string, int > dict;
   std::fstream tsdbfile;
-
-  std::string pid; 
-  std::cin >> pid;
-  exec(pid.c_str(),dict);
+  
+  exec(str_pid.c_str(),dict);
   for(std::map<std::string,int>::iterator iter = dict.begin(); iter != dict.end(); ++iter)
   { 
     std::string k=iter->first;
