@@ -16,7 +16,7 @@
 
 
 void
-tsdb_stdout(std::fstream& outfile,std::string metric="exe.0.null",std::string data=""){
+tsdb_stdout(std::fstream& outfile,std::string metric="LOFAR.0.null",std::string data=""){
   /*Writes metric, stamp and data to a file
     TODO: Make this also sendable through std::out for tcollector*/
   using namespace std::chrono;
@@ -293,10 +293,10 @@ main(int argc, char *argv[]) {
   struct tm * now = localtime( & t );
   std::cerr <<"$proc-Start time: "<< (now->tm_hour)<<":"<<(now->tm_min)<<":"<<(now->tm_sec) << std::endl; 
   std::remove_if(configfile.begin(), configfile.end(), isspace);
-  if (metric.empty()){
-   metric="exe."+str_pname+"."+str_pid;}
-  else {
-   metric="exe."+metric+"."+str_pid;}
+  if (metric.empty()){ 
+   metric="LOFAR."+str_pname+"."+str_pid;} // used to start with exe. but changed to LOFAR.
+  else {				   // for the LOFAR case	
+   metric="LOFAR."+metric+"."+str_pid;}
 
   std::fstream tsdbfile;
 
